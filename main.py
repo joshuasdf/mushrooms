@@ -33,6 +33,7 @@ print("Initial shape:", df.shape)
 # TODO: Get the top 5 rows (1 line of code)
 print(df.head())
 
+
 # -----------------------------
 # 1) Basic cleaning (duplicates, empty rows)
 # -----------------------------
@@ -51,6 +52,7 @@ print("Dropped fully empty rows:", before - df.shape[0])
 print("\nMissing values per column (top 10):")
 # TODO: Display the missing values per column (1 line of code)
 print(df.isnull().sum())
+
 
 for i in df:
     df[i] = df[i].astype("category").cat.codes
@@ -77,7 +79,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 print("\nTrain/Test shapes:", X_train.shape, X_test.shape)
 
 # Detect types BEFORE imputation/encoding
-orig_numeric_cols = []# TODO: Extract the numeric columns from the training data set and store it as a list
+orig_numeric_cols = X_train.select_dtypes(include=[np.number]).columns.tolist()
 orig_categorical_cols = ['class', 'cap-shape', 'cap-surface', 'cap-color', 'bruises', 'odor', 'gill-attachment', 'gill-spacing', 'gill-size', 'gill-color', 'stalk-shape', 'stalk-root', 'stalk-surface-above-ring', 'stalk-surface-below-ring', 'stalk-color-above-ring', 'stalk-color-below-ring', 'veil-type', 'veil-color', 'ring-number', 'ring-type', 'spore-print-color', 'population', 'habitat']# TODO: Extract the categorical columns from the training data set and store it as a list
 print("Original numeric cols:", orig_numeric_cols if orig_numeric_cols else "None")
 print("Original categorical cols (sample):", orig_categorical_cols[:10])
@@ -156,13 +158,17 @@ scaler = StandardScaler()
 numeric_cols_to_scale = [c for c in orig_numeric_cols if c in X_train_enc.columns]
 
 # TODO: Fit the scaler and scale the train and test data separately. (3 lines of code)
-X_train_enc[numeric_cols_to_scale] = scaler.fit_transform(X_train_enc[numeric_cols_to_scale])
-X_test_enc[numeric_cols_to_scale] = scaler.transform(X_test_enc[numeric_cols_to_scale])
+if numeric_cols_to_scale:
+    X_train_enc[numeric_cols_to_scale] = scaler.fit_transform(X_train_enc[numeric_cols_to_scale])
+    X_test_enc[numeric_cols_to_scale] = scaler.transform(X_test_enc[numeric_cols_to_scale])
+    print(numeric_cols_to_scale)
+else:
+    print("none")
 
 # TODO: Print the names of the columns scaled if any (4 lines of code at max)
 
-print(numeric_cols_to_scale if numeric_cols_to_scale else "none")
 
+print(numeric_cols_to_scale if numeric_cols_to_scale else "none")
 # --------------------------------------------
 # 6) KNN + Grid Search
 # --------------------------------------------
@@ -173,12 +179,26 @@ print(numeric_cols_to_scale if numeric_cols_to_scale else "none")
 # Find and print the best_estimator_ and print the best parameters
 # Roughly 7 - 9 lines of code including printing the 
 
+param_grid = {
+    "n_neighbors": [3, 5, 7, 9, 11, 15, 21],
+    "weights": ["uniform", "distance"],
+    "p": [1, 2]  # 1 = Manhattan, 2 = Euclidean
+}
+
+knn = KNeighborsClassifier()
+grid = GridSearchCV(knn, param_grid, cv=5, scoring="accuracy")
+grid.fit(X_train_enc, y_train)
+
+best_knn = grid.best_estimator_
+print("\nBest estimator:", best_knn)
+print("Best parameters:", grid.best_params_)
+
 
 # --------------------------------------------
 # 7) Evaluate on held-out TEST
 # --------------------------------------------
 # TODO: Use KNN to make predictions on the test dataset (1 line of code)
-
+y_pred = best_knn.predict(X_test_enc)
 
 test_acc = accuracy_score(y_test, y_pred)
 print("\nTest accuracy: {:.4f}".format(test_acc))
@@ -187,7 +207,6 @@ print("\nClassification report:\n", classification_report(y_test, y_pred))
 # Confusion Matrix
 cm = confusion_matrix(y_test, y_pred, labels=np.unique(y))
 disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=np.unique(y))
-plt.figure()
 disp.plot(values_format="d")
 plt.title("Confusion Matrix (Test)")
 plt.tight_layout()
@@ -254,4 +273,5 @@ if hasattr(best_knn, "predict_proba"):
 # Best KNN: KNeighborsClassifier(n_neighbors=7, p=2, weights='distance')
 # --------------------------------------------
 # TODO: Print the final stats (2 lines of code)
-
+print("\nFinal feature count:", X_train_enc.shape[1])
+print("Best KNN:", best_knn)
